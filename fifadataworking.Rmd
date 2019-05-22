@@ -1,0 +1,282 @@
+---
+title: "Untitled"
+author: "Swati Adipudi"
+date: "5/20/2019"
+output: html_document
+---
+** Data Analysis of FIFA 2019 Soccer Players **
+** Created by: Faatemah Mallick, Swati Adipudi, Zohra Ali **
+
+##Overview 
+1. Preamble
+2. Introduction
+3. Required Libraries
+4. Ingesting Data
+5. Data Clean-Up
+*5.1 Scraping Data*
+*5.2 Renaming Columns*
+*5.3 Missing Data*
+*5.3 Creating a table*
+*5.4 Narrowing down values to a more general label*
+6. Data Visualization
+*6.1 Scatter plot showing the relationship between the overall rating vs the market value*
+*6.2 Linear regression between the overall rating and market value*
+*6.3 Creating another column for continents*
+*6.4 Scatter plot for wages of players based on their geographic location*
+*6.6 Scatter plot to show the correlation between a players weight and sprint speed*
+*6.7 Violin graph showing the level of stamina for each player position*
+*6.8 Scatter plot to show the earning of players and their goalkeeper kicking*
+*6.9 Scatter plot show aggression and the number of penalties of players*
+7. Conclusion
+
+#1. Preamble 
+This is a tutorial that will walk you through the data science pipeline to provide analysis for the FIFA 2019 soccer players.
+
+#2. Introduction
+This is a tutorial where we perform exploratory data analysis on 2019 FIFA soccer players. The 2019 FIFA data set contains a variety of different aspects for all soccer players regarding their age, team, skill moves, work rate ect. Using these different features we will perform exploratory data analysis on them to create several conclusions on each of the attributes.  Here is a direct link to the data set: https://www.kaggle.com/karangadiya/fifa19#data.csv
+
+#3. Required Libraries 
+Here we load libraries as well as the data set to be able to retrieve and manipulate information needed for our tutorial. This data set looks at the latest edition of FIFA 2019 soccer players. For more information about each of the libraries and their corresponding methods, they can be found in the R documentation. 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(stringr)
+library(ggplot2)
+library(rpart)
+library("rpart.plot")
+```
+
+#4. Ingesting Data
+The first and foremost step in the data analysis pipeline is ingesting the data from a data set by the "read_csv" command. 
+```{r, include=FALSE}
+fifadata_tab <- read_csv("/Users/Swati/Downloads/fifadata.csv")
+```
+
+#5. Data Clean-Up
+In this section, we'll be: 
+1. Narrowing the Data
+2. Renaming the columns
+3. Replace missing data
+
+*5.1 Scraping Data*
+In some cases when downloading a csv file from a data repository, there could often be times where the file has data that is not related to your field of research and therefore not important to you. We can then use forms of scraping to narrow our data down to what we want and select the attributes needed. What we do here is narrow down the size of data displayed and used. The original data size was 18.2k x 89 and we changed it to 250 x 54 to work with a more relevant sample of the top 250 rated soccer players in FIFA 2019. 
+
+```{r cleaning1}
+fifadata_tab <- fifadata_tab %>% slice(1:100)
+fifadata_tab <-fifadata_tab[-c(1,2,5,7,11,23:26,29:54)]
+```
+
+*5.2 Renaming Columns*
+Here, we rename existing column headers to help us manipulate data easier when needed. In the data set, the work rate column was labeled as "High/ High" "High/ Medium" etc. for Attack/Defense. We can replace this scale to a number scale for an overall rating and change the column type to deal with numbers so the data is easier to handle for future use.  
+
+```{r cleaning2}
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "High/ High"] <- 5
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "High/ Medium"] <- 4
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "High/ Low"] <- 3
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "Medium/ High"] <- 4
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "Medium/ Medium"] <- 3
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "Medium/ Low"] <- 2
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "Low/ High"] <- 3
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "Low/ Medium"] <- 2
+fifadata_tab$`Work Rate`[fifadata_tab$`Work Rate` == "Low/ Low"] <- 1
+fifadata_tab$`Work Rate` = as.numeric(as.character(fifadata_tab$`Work Rate`))
+
+fifadata_tab$Height <- sapply(strsplit(as.character(fifadata_tab$Height),"'|\""),
+        function(x){12*as.numeric(x[1]) + as.numeric(x[2])})
+
+fifadata_tab$Weight<-gsub( "lbs", "", (fifadata_tab$Weight))
+fifadata_tab$Weight<- as.numeric(fifadata_tab$Weight)
+
+fifadata_tab$Value<-gsub( "€|M", "", (fifadata_tab$Value))
+fifadata_tab$Value<- as.numeric(fifadata_tab$Value)
+
+fifadata_tab$Wage<-gsub( "€|K", "", (fifadata_tab$Wage))
+fifadata_tab$Wage<- as.numeric(fifadata_tab$Wage)
+
+fifadata_tab$`Release Clause` <-gsub( "€|M", "", (fifadata_tab$`Release Clause`))
+fifadata_tab$`Release Clause` = as.numeric(as.character(fifadata_tab$`Release Clause`))
+
+```
+
+*5.3 Missing Data*
+In the data set, there is missing data where the value corresponding to the columns are unrecorded or missing. Instead of removing the observation completely, we can impute the missing data. In our case, the body type column consists of missing data and so we can replace it with the average of the body type using the non-missing values. 
+
+```{r tidy data}
+fifadata_tab$`Body Type`[regexpr("(Lean|Normal|Stocky)",fifadata_tab$`Body Type`) != 1] <- "Normal"
+```
+
+*5.3 Creating a table*
+Here we create a table with columns labeled as minimum, average, and maximum which correspond to the players height, weight and age (the rows) for the soccer players. So for example, looking at the table outputted we can see the minimum height is 64 inches, the average is 71.68 inches, the max is 78 inches and so on.
+
+```{r}
+avg_H <- mean(fifadata_tab$Height)
+max_H <- max(fifadata_tab$Height)
+min_H <- min(fifadata_tab$Height)
+
+avg_W <- mean(fifadata_tab$Weight)
+min_W <- min(fifadata_tab$Weight)
+max_W <- max(fifadata_tab$Weight)
+
+
+avg_A <- mean(fifadata_tab$Age)
+max_A <- max(fifadata_tab$Age)
+min_A <- min(fifadata_tab$Age)
+
+stats_table <- matrix(c(min_H,avg_H,max_H,min_W,avg_W,max_W,min_A,avg_A, max_A),ncol=3,byrow=TRUE)
+ colnames(stats_table) <- c("Minimum:","Average:","Maximum:")
+ rownames(stats_table) <- c("Height:","Weight:","Age:")
+ stats_table <- as.table(stats_table)
+ stats_table
+```
+*5.4 Narrowing down values to a more general label*
+Because we have so many values to deal with, we can group them all together and give them a label that summarizes them all. That is exactly what we do here. For example, in the data set the defenders are specifically shown but instead we can take all 5 positions and just label them as defenders. This is needed later in the tutorial.
+
+```{r}
+fifadata_tab$`Continent`[regexpr("(Armenia|France|Austria|Belgium|Bosnia Herzegovina|Croatia|Czech Republic|Denmark|England|Finland|Germany|Greece|Italy|Montenegro|Norway|Netherlands|Poland|Portugal|Scotland|Sweden|Serbia|Slovakia|Slovenia|Spain|Switzerland|Wales)",fifadata_tab$`Nationality`) == 1] <- "Europe"
+fifadata_tab$`Continent`[regexpr("(Korea Republic)",fifadata_tab$`Nationality`) == 1] <- "Asia"
+
+fifadata_tab$`Continent`[regexpr("(Argentina|Brazil|Chile|Colombia|Costa Rica|Uruguay)",fifadata_tab$`Nationality`) == 1] <- "South America"
+fifadata_tab$`Continent`[regexpr("(Algeria|Egypt|Gabon|Morocco|Senegal|Ghana|Guinea)",fifadata_tab$`Nationality`) == 1] <- "Africa"
+fifadata_tab$`Country`[regexpr("(Ajax)",fifadata_tab$`Club`) == 1] <- "Amsterdam"
+fifadata_tab$`Country`[regexpr("(LA Galaxy)",fifadata_tab$`Club`) == 1] <- "US"
+fifadata_tab$`Country`[regexpr("(Al Nassr)",fifadata_tab$`Club`) == 1] <- "Saudi Arabia"
+fifadata_tab$`Country`[regexpr("(Arsenal|Chelsea|Everton|Leicester City|Liverpool|Manchester City|Manchester United|Tottenham Hotspur|West Ham United|Wolverhampton Wanderers)",fifadata_tab$`Club`) == 1] <- "England"
+fifadata_tab$`Country`[regexpr("(AS Monaco|AS Saint-Étienne|OGC Nice|Olympique de Marseille|Olympique Lyonnais|Paris Saint-Germain)",fifadata_tab$`Club`) == 1] <- "France"
+fifadata_tab$`Country`[regexpr("(Atalanta|Inter|Juventus|Lazio|Milan|Napoli|Roma)",fifadata_tab$`Club`) == 1] <- "Italy"
+fifadata_tab$`Country`[regexpr("(Athletic Club de Bilbao|Atlético Madrid|FC Barcelona|RC Celta|Real Betis|Real Madrid|Real Sociedad|Sevilla FC|Valencia CF|Villarreal CF)",fifadata_tab$`Club`) == 1] <- "Spain"
+fifadata_tab$`Country`[regexpr("(Cruzeiro|Grêmio|Atlético Mineiro)",fifadata_tab$`Club`) == 1] <- "Brazil"
+fifadata_tab$`Country`[regexpr("(Bayer 04 Leverkusen|Borussia Dortmund|Borussia Mönchengladbach|FC Schalke 04|Hertha BSC|RB Leipzig|FC Bayern München|RB Leipzig|SV Werder Bremen|TSG 1899 Hoffenheim|1. FC Köln)",fifadata_tab$`Club`) == 1] <- "Germany"
+fifadata_tab$`Country`[regexpr("(FC Porto|SL Benfica|Sporting CP)",fifadata_tab$`Club`) == 1] <- "Portugal"
+fifadata_tab$`Country`[regexpr("(Beşiktaş JK)",fifadata_tab$`Club`) == 1] <- "Turkey"
+fifadata_tab$`Country`[regexpr("(Shanghai SIPG FC|Dalian YiFang FC|Guangzhou Evergrande Taobao FC)",fifadata_tab$`Club`) == 1] <- "China"
+fifadata_tab$`Country`[regexpr("(Vissel Kobe)",fifadata_tab$`Club`) == 1] <- "Japan"
+
+
+fifadata_tab$`General Position`[regexpr("(CB|LB|LCB|RB|RCB)",fifadata_tab$`Position`) == 1] <- "Defenders"
+fifadata_tab$`General Position`[regexpr("(CAM|CDM|CM|LAM|LCM|LDM|LM|RCM|RDM|RM)",fifadata_tab$`Position`) == 1] <- "Midfielders"
+fifadata_tab$`General Position`[regexpr("(LF|LS|LW|RF|RS|RW|ST)",fifadata_tab$`Position`) == 1] <- "Attacker"
+fifadata_tab$`General Position`[regexpr("(GK)",fifadata_tab$`Position`) == 1] <- "Goal Keeper"
+```
+For more information regarding tidying data and other forms of data preparation refer to: http://www.hcbravo.org/IntroDataSci/bookdown-notes/tidying-data.html
+
+
+Now that our data is organized and cleaned up the way we want it, we can start to use it to create visuals and take note of any pattern among our chosen data. 
+
+
+#6. Data Visualization 
+We use data visualization for modeling our statistics though graphical representations. We then use these structures to make informed conclusions based on what we see. 
+
+*6.1 Scatter plot showing the relationship between the overall rating vs the market value*
+Here we are using a scatter plot to visualize the relationship between two attributes, the overall rating and the market value. Looking at the plot we can see that the higher the rating, the higher the market value.
+```{r}
+ggplot(fifadata_tab, aes(x = Overall, y = Value)) + 
+         labs(title = "Overall Rating vs Market Value", x = "rating", y = "euros by millions") + 
+  geom_smooth(method = lm) +
+         geom_point() 
+```
+
+
+*6.2 Linear regression between the overall rating and market value*
+Linear regression can be used ......
+This plot shows the linear regression for overall rating and market value. 
+```{r}
+library(broom)
+linear_regression <- lm(Overall ~ Value, fifadata_tab)
+tidy(linear_regression)
+```
+
+*6.4 Scatter plot for wages of players based on their geographic location*
+This section displays three graphs where each are explained below respectively. Using these graphs, we can determine how much each player is getting paid based on their geographic location. 
+Plot 1: This plot measures the overall rating with euros in millions for each continent. Looking at the graph we can see that South American and European players get paid more in comparison to the other continents. 
+Plot 2: This plot measures the overall rating with euros in millions for each country. Looking at the graph we can see that players from Spain and England get paid more in comparison to the other continents. 
+Plot 3: This graph shows the line of best fit for the overall rating with euros in millions for each country.
+
+```{r}
+ggplot(fifadata_tab, aes(x = Overall, y = Wage, color = Continent)) + 
+  geom_point() + 
+  geom_smooth(method = lm) +
+  labs(x = "Overall Rating", y = "Euros in Millions")
+
+ggplot(fifadata_tab, aes(x = Overall, y = Wage, color = Country)) + 
+  geom_point() + 
+  labs(x = "Overall Rating", y = "Euros in Millions")
+
+ggplot(fifadata_tab, aes(x = Overall, y = Wage, color = Country)) + 
+  geom_smooth(method = lm, se=FALSE) +
+  labs(x = "Overall Rating", y = "Euros in Millions")
+```
+*6.6 Scatter plot to show the correlation between a players weight and sprint speed*
+Here we use a scatter plot to show the relationship between the sprint speed of a player and their weight. The more they weigh, the less sprint speed they have.
+```{r}
+fifadata_tab %>%
+  ggplot(mapping =aes(x=Weight, y=SprintSpeed)) +
+  geom_point() +
+  geom_smooth(method = lm)+
+  labs(title="SprintSpeed vs. Weight", x = "Weight")
+```
+
+*6.7 Violin graph showing the level of stamina for each player position*
+This violin graph shows the spread of stamina depending on the position of the player which can help us determine which position has the highest stamina. Looking at the graph we can see that the attackers, defenders and midfielders had the most stamina and the goal keepers had the lowest stamina. We use a violin plot for this statistic because we can see the more concentrated areas in how many players are associated with that specific position and stamina level. And so, we can see that midfielders had a fatter violin which indicates more players that had that specific amount of stamina.
+```{r}
+fifadata_tab %>%
+  ggplot(mapping =aes(x=`General Position`, y=Stamina)) +
+  geom_violin(fill = "#6B8E23") +
+  labs(title="Stamina vs. Position", x = "Position")
+```
+
+
+*6.8 Scatter plot to show the earning of players and their goalkeeper kicking*
+Looking at this scatter plot we can't really notice any correlation between the preferred foot of the goal keeper and the overall rating. This is a great example showing that not all attributes are related to each other and we need to be aware of what data we're comparing to ensure correlation and valid data.
+```{r}
+  ggplot(subset(fifadata_tab,`General Position` == "Goal Keeper"))+
+  geom_point(aes(x=Overall,y=GKKicking, color = `Preferred Foot`))+
+  labs(x = "Overall Rating", y = "Goal Keeper Kicking")
+```
+*6.9 Scatter plot show aggression and the number of penalties of players*
+```{r}
+
+fifadata_tab %>%
+  ggplot(mapping = aes(x = Penalties, y = Aggression)) + geom_smooth(fill = "#0000FF" ) +
+  labs(title="Penalties vs. Aggression", x = "Penalties", y = "Aggression") 
+
+```
+
+*6.10 Violin Graph showing the relationship between work rate and position.* 
+This violin graph shows the spread of the work rate depending on the position of the player. This allows us to discover which position conducts the most amount of work. Based on the graph, it is quite obvious that the goal keeper does very little work, only a rate of 3, and that it is the same for almost every goalkeeper as there is no range for work rate. However, the rest of the positions such as attacker, defender, and midfielder all have spreads ranging between a work rate of 5 to about a work rate of 2 or 3. The attacker position has a higher concentration at work rates 2, 3, 4, and 5 while other positions such as defender and midfielder and even concentration throughout their entire spreads.  There is an exception for defender where the violin is wider and work rate 4 compared to the rest of the spread and midfielder gets less wider as it goes from a work rate of 5 down to 2. This graph concludes that goalkeepers do not do much work compared to the rest of the players as they just wait in the goal until the ball comes to them.  
+```{r}
+fifadata_tab %>%
+  ggplot(mapping = aes(x =`General Position`, y = `Work Rate`)) + geom_violin(fill = "#0000FF" ) +
+  labs(title="Work Rate vs. Position", x = "Position", y = "Work Rate")
+
+```
+
+*6.11 Bar graph displaying number of players from each country*
+Since the data provided us with a list of all of the players, we decided to break it down in order to determine which country each player play for. We then used this new information to create a bar graph for each of the players. Based on the results, it can be concluded that England, Spain, and Italy contain the most about of Fifa players while countries such as China, Japan, and Portugal have the least amount of players in the top 250.  
+```{r}
+fifadata_tab %>%
+  ggplot(mapping = aes(x = Country)) + geom_bar(fill = "#F442EE" ) +
+  labs(title="Number of players from each Country", x = "Country") 
+```
+
+
+```{r}
+fit <- lm(Overall ~ Value+ `Work Rate` + Wage + `Release Clause` + Country + Nationality, data = fifadata_tab)
+broom::tidy(fit) %>% knitr::kable() 
+```
+
+```{r}
+augmentedData <- fit %>% augment() %>% select(-.se.fit, -.hat, -.sigma, -.cooksd, -.std.resid)
+augmentedData %>% ggplot(aes(x = .fitted, y = .resid)) + geom_violin()
+```
+
+```{r}
+augmentedData %>% ggplot(aes(x = factor(Country), y = .resid)) + geom_violin()
+```
+
+```{r}
+reg_tree <- rpart(Overall ~ Value+ `Work Rate` + Wage + `Release Clause` + Country, data = fifadata_tab)
+rpart.plot(reg_tree)
+```
+
+#7. Conclusion 
+You have now completed the full tutorial on learning how to go through the data science pipeline and use different techniques and methods to give yourself a better understanding the statistics and measures of soccer players in 2019. Playing around with different attributes and measures, you can really start to understand how these different techniques such as tidying data, creating scatter plot, ect can help you come to conclusions and create predictions on your work. Utilizing and manipulating this data set gave us insight on how important features of a soccer player are to winning a team. Height, weight, continent, position, stamina, wages all help us better understand a player’s market value. In addition, we could also create models and figures to predict other stats regarding our field of work. A great place to find datasets for another subject that may interest you is https://www.kaggle.com/datasets. Hope our tutorial was helpful and we aim to provide more content like this to help you better understand dataset trends, patterns, and predictions.
+
