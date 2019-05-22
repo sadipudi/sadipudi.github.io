@@ -1,6 +1,6 @@
 ---
 title: "Untitled"
-author: "Swati Adipudi"
+author: "Swati Adipudi, Zohra Ali, Faatemah Mallick"
 date: "5/20/2019"
 output: html_document
 ---
@@ -27,7 +27,14 @@ output: html_document
 *6.7 Violin graph showing the level of stamina for each player position*
 *6.8 Scatter plot to show the earning of players and their goalkeeper kicking*
 *6.9 Scatter plot show aggression and the number of penalties of players*
-7. Conclusion
+*6.10 Violin Graph showing the relationship between work rate and position.*
+*6.11 Bar graph displaying number of players from each country*
+
+7. Machine Learning
+*7.1 Linear Regression Model*
+*7.2 Hypothesis Testing*
+*7.3 Plotting Model*
+8. Tree Based Methods
 
 #1. Preamble 
 This is a tutorial that will walk you through the data science pipeline to provide analysis for the FIFA 2019 soccer players.
@@ -256,22 +263,42 @@ fifadata_tab %>%
   ggplot(mapping = aes(x = Country)) + geom_bar(fill = "#F442EE" ) +
   labs(title="Number of players from each Country", x = "Country") 
 ```
+# 7. Machine Learning 
 
+## 7.1 Creating Linear Regression Model
+OverallRating = B0+B1\*Value+B2\*WorkRate+B3\*Wage+B4\*ReleaseClause+B5\*Country+B6\*Continent
 
+We choose these factors becuase we had analyzed them earlier and saw that they would be good fit to make a Linear Regession Model. With this linear model we can determine the overall rating of a player from their Value, Work Rate, Wage, Release Clause, what Country they play for, and what Continent they are from.
+
+## 7.2 Hypothesis Testing
 ```{r}
-fit <- lm(Overall ~ Value+ `Work Rate` + Wage + `Release Clause` + Country + Nationality, data = fifadata_tab)
+fit <- lm(Overall ~ Value+ `Work Rate` + Wage + `Release Clause` + Country + Continent, data = fifadata_tab)
 broom::tidy(fit) %>% knitr::kable() 
 ```
 
-```{r}
-augmentedData <- fit %>% augment() %>% select(-.se.fit, -.hat, -.sigma, -.cooksd, -.std.resid)
-augmentedData %>% ggplot(aes(x = .fitted, y = .resid)) + geom_violin()
-```
+Here we tested the model that was created in the previous step to see if we can reject the null hypotesis. If this is true then Overall Ranking is determinant on the factors tested.
+
+# 7.2 Plotting Model
+Previouls we looked if the factors tested have an effect on Overall Ranking. In this step we test how accurate the Model actually is. Here we are graphing the residual values vs. the actual value
 
 ```{r}
-augmentedData %>% ggplot(aes(x = factor(Country), y = .resid)) + geom_violin()
+augmentedData <- fit %>% 
+  augment() %>% 
+  select(-.se.fit, -.hat, -.sigma, -.cooksd, -.std.resid) 
+augmentedData %>% 
+  ggplot(aes(x = .fitted, y = .resid)) + geom_violin()+
+  labs(title="Residual vs Actual Values") 
 ```
+This shows that the model is accurate because there is a high concentration of points around 0. This shows that for the most part we had created an accurate model
 
+```{r}
+augmentedData %>% ggplot(aes(x = factor(Country), y = .resid)) + geom_violin() +
+  labs(title="Country vs. Residuals") 
+```
+Here we are controlling for Country to see if we can make our model more accurate.
+
+# 8. Tree Based Methods
+Regression Trees sort the data on the concentration in a condition without strict values as cut offs as predictors.
 ```{r}
 reg_tree <- rpart(Overall ~ Value+ `Work Rate` + Wage + `Release Clause` + Country, data = fifadata_tab)
 rpart.plot(reg_tree)
